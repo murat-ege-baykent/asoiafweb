@@ -19,16 +19,16 @@ const NavBar = () => {
           {/* Navigation Links */}
           <div className="hidden md:flex space-x-8">
             <NavLink to="/" className={getLinkClass}>
-              Home
+                Home  |  
             </NavLink>
             <NavLink to="/characters" className={getLinkClass}>
-              Characters
+                |  Characters  |   
             </NavLink>
             <NavLink to="/houses" className={getLinkClass}>
-              Houses
+                |  Houses  |  
             </NavLink>
             <NavLink to="/books" className={getLinkClass}>
-              Books
+                |  Books  
             </NavLink>
           </div>
           

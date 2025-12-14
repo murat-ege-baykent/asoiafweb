@@ -1,130 +1,109 @@
-import { useState, useEffect } from 'react';
-import { fetchCharacters, searchCharacters } from '../api';
-import ItemCard from '../components/ItemCard';
+import { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { fetchCharacterById } from '../api';
 import Loading from '../components/Loading';
-import SearchBar from '../components/SearchBar';
+import Error from '../components/Error';
+import FamilyTree from '../components/FamilyTree'; // Import the tree
 
-const CharactersList = () => {
-  const [characters, setCharacters] = useState([]);
+const CharacterDetail = () => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  
+  const [character, setCharacter] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [error, setError] = useState(null);
 
-  // 1. Safe Helper to get ID
-  const getIdFromUrl = (url) => {
-    if (!url) return Math.random().toString();
-    const parts = url.split('/');
-    return parts[parts.length - 1];
-  };
-
-  // 2. The Data Loader - Built like the Debug version
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
+    const getCharacter = async () => {
       try {
-        let data;
-        
-        // Only use search API if there is actually a search term
-        if (searchTerm && searchTerm.length > 0) {
-            console.log("Searching for:", searchTerm);
-            data = await searchCharacters(searchTerm, page, 12);
-        } else {
-            console.log("Fetching standard list page:", page);
-            data = await fetchCharacters(page, 12);
-        }
-
-        // 3. Absolute Safety Check
-        if (Array.isArray(data)) {
-            setCharacters(data);
-        } else {
-            console.error("API Error: Data is not an array", data);
-            setCharacters([]); 
-        }
-
+        setLoading(true);
+        setCharacter(null); // Clear old data first
+        const data = await fetchCharacterById(id);
+        setCharacter(data);
       } catch (err) {
-        console.error("Critical Fetch Error:", err);
-        // Don't break the UI, just show empty
-        setCharacters([]); 
+        setError("Could not load character details.");
       } finally {
         setLoading(false);
       }
     };
 
-    // Small delay to prevent crashing API while typing
-    const timeoutId = setTimeout(() => {
-      loadData();
-    }, 500);
+    getCharacter();
+  }, [id]);
 
-    return () => clearTimeout(timeoutId);
-  }, [page, searchTerm]);
+  if (loading) return <Loading />;
+  if (error) return <Error message={error} />;
+  if (!character) return <Error message="Character not found" />;
 
-  // 4. Handle Search
-  const handleSearch = (term) => {
-    setSearchTerm(term);
-    setPage(1); // Always reset to page 1 when searching
+  const renderList = (items) => {
+    if (!items || items.length === 0 || items[0] === "") return "None";
+    return items.join(", ");
   };
 
   return (
-    <div>
-      <h1 className="text-3xl font-bold text-white mb-6">Characters</h1>
+    <div className="max-w-4xl mx-auto">
+      <button 
+        onClick={() => navigate(-1)}
+        className="mb-6 text-slate-400 hover:text-white flex items-center transition-colors"
+      >
+        ← Back to List
+      </button>
 
-      {/* Search Input */}
-      <SearchBar onSearch={handleSearch} placeholder="Search (e.g., Jon Snow)..." />
-      
-      {/* Loading & Content */}
-      {loading ? (
-        <Loading />
-      ) : (
-        <>
-          {/* If list is empty */}
-          {characters.length === 0 ? (
-             <div className="text-center py-10 bg-slate-800 rounded border border-slate-700">
-               <p className="text-slate-300 text-lg">No characters found.</p>
-               <p className="text-slate-500 text-sm mt-2">
-                 If searching, remember to use exact full names (e.g., "Jon Snow").
-               </p>
-             </div>
-          ) : (
-             /* Grid of Items */
-             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-               {characters.map((char, index) => (
-                 <ItemCard
-                   key={`${getIdFromUrl(char.url)}-${index}`}
-                   title={char.name || "Unknown"}
-                   subtitle={char.culture ? `Culture: ${char.culture}` : "Unknown Culture"}
-                   details={[
-                      { label: "Gender", value: char.gender },
-                      { label: "Born", value: char.born || "Unknown" },
-                   ]}
-                   link={`/characters/${getIdFromUrl(char.url)}`}
-                 />
-               ))}
-             </div>
+      <div className="bg-slate-800 rounded-xl shadow-2xl border border-slate-700 overflow-hidden">
+        
+        {/* Header */}
+        <div className="bg-slate-900 p-8 border-b border-slate-700">
+          <h1 className="text-4xl font-bold text-white mb-2">
+            {character.name || "Unknown Name"}
+          </h1>
+          {character.aliases && character.aliases[0] && (
+            <p className="text-xl text-blue-400 italic">
+              "{character.aliases[0]}"
+            </p>
           )}
+        </div>
 
-          {/* Pagination (Only show buttons if we have data) */}
-          {characters.length > 0 && (
-            <div className="flex justify-center items-center mt-10 space-x-4">
-              <button
-                disabled={page === 1}
-                onClick={() => setPage(p => Math.max(p - 1, 1))}
-                className="px-4 py-2 bg-slate-700 text-white rounded disabled:opacity-50"
-              >
-                Previous
-              </button>
-              <span className="text-slate-400">Page {page}</span>
-              <button
-                onClick={() => setPage(p => p + 1)}
-                className="px-4 py-2 bg-slate-700 text-white rounded hover:bg-blue-600"
-              >
-                Next
-              </button>
+        {/* Details Grid */}
+        <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold text-white border-b border-slate-600 pb-2 mb-4">
+              Personal Info
+            </h2>
+            <DetailRow label="Gender" value={character.gender} />
+            <DetailRow label="Culture" value={character.culture} />
+            <DetailRow label="Born" value={character.born} />
+            <DetailRow label="Died" value={character.died} />
+          </div>
+
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold text-white border-b border-slate-600 pb-2 mb-4">
+              Titles & Affiliations
+            </h2>
+            <DetailRow label="Titles" value={renderList(character.titles)} />
+            <DetailRow label="Aliases" value={renderList(character.aliases)} />
+            <div className="pt-4 mt-4 border-t border-slate-700/50">
+               <DetailRow label="Played By" value={renderList(character.playedBy)} />
             </div>
-          )}
-        </>
-      )}
+          </div>
+        </div>
+
+        {/* --- FAMILY TREE (Safe Mode) --- */}
+        <div className="p-8 bg-slate-900/50 border-t border-slate-700">
+           <FamilyTree character={character} />
+        </div>
+        {/* ------------------------------- */}
+
+      </div>
     </div>
   );
 };
 
-export default CharactersList;
+const DetailRow = ({ label, value }) => (
+  <div className="flex flex-col sm:flex-row sm:justify-between">
+    <span className="text-slate-400 font-medium">{label}:</span>
+    <span className="text-slate-200 sm:text-right font-light">
+      {value || "Unknown"}
+    </span>
+  </div>
+);
+
+export default CharacterDetail;
